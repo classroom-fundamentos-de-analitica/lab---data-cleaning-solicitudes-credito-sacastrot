@@ -7,24 +7,38 @@ correctamente. Tenga en cuenta datos faltantes y duplicados.
 
 """
 import pandas as pd
-
+import re
+from datetime import datetime
 
 def clean_data():
 
-    df = pd.read_csv("solicitudes_credito.csv", sep=";")
+    df = pd.read_csv("solicitudes_credito.csv", sep=";", index_col = 0)
+    
+    # Se eliminan na y duplicados
+    df.dropna(axis=0,inplace=True)
+    df.drop_duplicates(inplace = True)
 
-    df = df.drop('Unnamed: 0', axis = 1)
-    df.fecha_de_beneficio = pd.to_datetime(df.fecha_de_beneficio, dayfirst=True)  #formato de fecha estandarizado
+    # Se pasa a minuscula la columna sexo, de esta forma solo quedan dos posibles valores
+    for columna in ['sexo', 'tipo_de_emprendimiento', 'idea_negocio', 'línea_credito', 'barrio']: #['sexo', 'tipo_de_emprendimiento', 'idea_negocio', 'barrio', 'línea_credito']:
+        df[columna] = df[columna].apply(lambda x: x.lower())
 
-    df['monto_del_credito'] = df['monto_del_credito'].map(lambda x: str(x).strip('$').replace(',','')) #estandarizando el formato de dinero
-    df.monto_del_credito = df.monto_del_credito.astype(float)   #No deja convertir a int, entonces primero convierto a float
-    df.monto_del_credito = df.monto_del_credito.astype(int)   #Luego a int
+    # Se depura la columna idea_negocio, barrio, para ello se eliminan los caracteres especiales
+    for character in ['_', '-']:
+        for columna in ['sexo', 'tipo_de_emprendimiento', 'idea_negocio', 'línea_credito', 'barrio']:
+            # Se eliminan los caracteres especiales
+            df[columna] = df[columna].apply(lambda x: x.replace(character, ' '))
 
-    #las columnas de strings pasandolas a minuscula y cambiando - y _ por espacios en blanco
-    df[['sexo','tipo_de_emprendimiento','idea_negocio','barrio','línea_credito']] = df[['sexo','tipo_de_emprendimiento','idea_negocio','barrio','línea_credito']].applymap(lambda s: s.lower().replace('-',' ').replace('_',' ') if type(s) == str else s)
+    df['monto_del_credito'] = df['monto_del_credito'].apply(lambda x: re.sub("\$[\s*]", "", x))
+    df['monto_del_credito'] = df['monto_del_credito'].apply(lambda x: re.sub(",", "", x))
+    df['monto_del_credito'] = df['monto_del_credito'].apply(lambda x: re.sub("\.00", "", x))
+    df['monto_del_credito'] = df['monto_del_credito'].apply(int)
+    
+    df['comuna_ciudadano'] = df['comuna_ciudadano'].apply(float)
 
-    #dropeo de nulos y duplicados
-    df.dropna(axis=0, inplace = True)
-    df.drop_duplicates(inplace=True)
+    df['fecha_de_beneficio'] = df['fecha_de_beneficio'].apply(lambda x: datetime.strptime(x, "%Y/%m/%d") if (len(re.findall("^\d+/", x)[0]) - 1) == 4 else datetime.strptime(x, "%d/%m/%Y"))
+
+    df.dropna(axis=0,inplace=True)
+    # # Se eliminan los registros duplicados
+    df.drop_duplicates(inplace = True)
 
     return df
